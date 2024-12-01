@@ -68,17 +68,29 @@ fn main() -> Result<()> {
     //endregion
 
     //region Part 2
-    // println!("\n=== Part 2 ===");
-    //
-    // fn part2<R: BufRead>(reader: R) -> Result<usize> {
-    //     Ok(0)
-    // }
-    //
-    // assert_eq!(0, part2(BufReader::new(TEST.as_bytes()))?);
-    //
-    // let input_file = BufReader::new(File::open(INPUT_FILE)?);
-    // let result = time_snippet!(part2(input_file)?);
-    // println!("Result = {}", result);
+    println!("\n=== Part 2 ===");
+
+    fn part2<R: BufRead>(reader: R) -> Result<i64> {
+        let input = parse_input(reader)?;
+        let mut answer = 0i64;
+        for num in input.first_col {
+            let count: i64 = input
+                .second_col
+                .iter()
+                .filter(|a| num == **a)
+                .map(|_| 1)
+                .sum();
+            answer += num * count;
+        }
+
+        Ok(answer)
+    }
+
+    assert_eq!(31, part2(BufReader::new(TEST.as_bytes()))?);
+
+    let input_file = BufReader::new(File::open(INPUT_FILE)?);
+    let result = time_snippet!(part2(input_file)?);
+    println!("Result = {}", result);
     //endregion
 
     Ok(())
