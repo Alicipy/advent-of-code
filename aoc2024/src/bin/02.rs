@@ -70,17 +70,41 @@ fn main() -> Result<()> {
     //endregion
 
     //region Part 2
-    // println!("\n=== Part 2 ===");
-    //
-    // fn part2<R: BufRead>(reader: R) -> Result<usize> {
-    //     Ok(0)
-    // }
-    //
-    // assert_eq!(0, part2(BufReader::new(TEST.as_bytes()))?);
-    //
-    // let input_file = BufReader::new(File::open(INPUT_FILE)?);
-    // let result = time_snippet!(part2(input_file)?);
-    // println!("Result = {}", result);
+    println!("\n=== Part 2 ===");
+
+    fn part2<R: BufRead>(reader: R) -> Result<usize> {
+        let input = parse_input(reader)?;
+
+        let mut result = 0;
+
+        for line in input.lines {
+            // hint: removing the first or last element does never break a safe list, so we
+            // do not need a special case for lists safe without removing an element.
+            for i in 0..line.len() {
+                let mut variation = line.clone();
+                variation.remove(i);
+
+                let sliding_window = variation.windows(2);
+                let differences: Vec<_> = sliding_window.map(|w| w[1] - w[0]).collect();
+                //println!("{:#?}", differences);
+                let all_up = differences.iter().all(|x| 0 < *x && *x < 4);
+                let all_down = differences.iter().all(|x| -4 < *x && *x < 0);
+
+                if all_up || all_down {
+                    result += 1;
+                    break;
+                }
+            }
+        }
+
+        Ok(result)
+    }
+
+    assert_eq!(4, part2(BufReader::new(TEST.as_bytes()))?);
+
+    let input_file = BufReader::new(File::open(INPUT_FILE)?);
+    let result = time_snippet!(part2(input_file)?);
+    println!("Result = {}", result);
     //endregion
 
     Ok(())
