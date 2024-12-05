@@ -41,6 +41,20 @@ const TEST: &str = "\
 97,13,75,29,47
 ";
 
+fn read_input<R: BufRead>(reader: R) -> (HashSet<String>, Vec<String>) {
+    let mut rules = HashSet::new();
+    let mut checks = vec![];
+    for line in reader.lines() {
+        let line = line.unwrap();
+        if line.contains("|") {
+            rules.insert(line);
+        } else if line.contains(",") {
+            checks.push(line);
+        }
+    }
+    (rules, checks)
+}
+
 fn main() -> Result<()> {
     start_day(DAY);
 
@@ -48,17 +62,7 @@ fn main() -> Result<()> {
     println!("=== Part 1 ===");
 
     fn part1<R: BufRead>(reader: R) -> Result<usize> {
-        let mut rules = HashSet::new();
-        let mut checks = vec![];
-
-        for line in reader.lines() {
-            let line = line?;
-            if line.contains("|") {
-                rules.insert(line);
-            } else if line.contains(",") {
-                checks.push(line);
-            }
-        }
+        let (rules, checks) = read_input(reader);
 
         let mut result = 0;
 
@@ -85,17 +89,49 @@ fn main() -> Result<()> {
     //endregion
 
     //region Part 2
-    // println!("\n=== Part 2 ===");
-    //
-    // fn part2<R: BufRead>(reader: R) -> Result<usize> {
-    //     Ok(0)
-    // }
-    //
-    // assert_eq!(0, part2(BufReader::new(TEST.as_bytes()))?);
-    //
-    // let input_file = BufReader::new(File::open(INPUT_FILE)?);
-    // let result = time_snippet!(part2(input_file)?);
-    // println!("Result = {}", result);
+    println!("\n=== Part 2 ===");
+
+    fn part2<R: BufRead>(reader: R) -> Result<i32> {
+        let (rules, checks) = read_input(reader);
+        let rules = rules
+            .iter()
+            .map(|x| {
+                let p = x.split_once("|").unwrap();
+                (p.0.parse::<i32>().unwrap(), p.1.parse::<i32>().unwrap())
+            })
+            .collect::<HashSet<(i32, i32)>>();
+
+        let mut res = 0;
+        for check in checks {
+            let current_order = check
+                .split(",")
+                .map(|x| x.parse::<i32>().unwrap())
+                .collect::<Vec<i32>>();
+            let mut parts: HashSet<_> = HashSet::from_iter(current_order.clone());
+
+            let mut order = vec![];
+            while !parts.is_empty() {
+                // Get number where no other number is in front (topological sort in slow)
+                let a = *(parts
+                    .iter()
+                    .find(|x| parts.iter().all(|y| !rules.contains(&(*y, **x))))
+                    .unwrap());
+                parts.remove(&a);
+                order.push(a);
+            }
+            if current_order != order {
+                res += order[order.len() / 2];
+            }
+        }
+
+        Ok(res)
+    }
+
+    assert_eq!(123, part2(BufReader::new(TEST.as_bytes()))?);
+
+    let input_file = BufReader::new(File::open(INPUT_FILE)?);
+    let result = time_snippet!(part2(input_file)?);
+    println!("Result = {}", result);
     //endregion
 
     Ok(())
