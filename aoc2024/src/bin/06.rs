@@ -109,17 +109,37 @@ fn main() -> Result<()> {
     //endregion
 
     //region Part 2
-    // println!("\n=== Part 2 ===");
-    //
-    // fn part2<R: BufRead>(reader: R) -> Result<usize> {
-    //     Ok(0)
-    // }
-    //
-    // assert_eq!(0, part2(BufReader::new(TEST.as_bytes()))?);
-    //
-    // let input_file = BufReader::new(File::open(INPUT_FILE)?);
-    // let result = time_snippet!(part2(input_file)?);
-    // println!("Result = {}", result);
+    println!("\n=== Part 2 ===");
+
+    fn part2<R: BufRead>(reader: R) -> Result<usize> {
+        let input = read_input(reader);
+
+        let start_field = find_start(&input)?;
+
+        let mut result = 0;
+        for i in 0..input.len() {
+            for j in 0..input[i].len() {
+                if (i, j) == start_field {
+                    continue;
+                }
+                let mut current_field = input.clone();
+                current_field[i][j] = '#';
+
+                let (_, steps) = simulate(&current_field);
+                if steps == MAX_STEPS {
+                    result += 1;
+                }
+            }
+        }
+
+        Ok(result)
+    }
+
+    assert_eq!(6, part2(BufReader::new(TEST.as_bytes()))?);
+
+    let input_file = BufReader::new(File::open(INPUT_FILE)?);
+    let result = time_snippet!(part2(input_file)?);
+    println!("Result = {}", result);
     //endregion
 
     Ok(())
