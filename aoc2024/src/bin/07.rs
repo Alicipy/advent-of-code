@@ -46,8 +46,8 @@ fn read_input<R: BufRead>(reader: R) -> Vec<Input> {
     inputs
 }
 
-fn validate(input: Input) -> bool {
-    fn recurse(vec: Vec<u64>) -> Vec<u64> {
+fn validate(input: Input, combination_function: fn(u64, u64) -> Vec<u64>) -> bool {
+    fn recurse(vec: Vec<u64>, combination_function: fn(u64, u64) -> Vec<u64>) -> Vec<u64> {
         if vec.len() == 1 {
             return vec;
         }
@@ -55,16 +55,31 @@ fn validate(input: Input) -> bool {
         let mut rest = vec.clone();
         let cur = rest.pop().unwrap();
 
-        let recursive_results = recurse(rest);
+        let recursive_results = recurse(rest, combination_function);
         let results = recursive_results
             .iter()
-            .flat_map(|a| vec![a + cur, a * cur])
+            .flat_map(|a| combination_function(*a, cur))
             .collect();
 
         results
     }
 
-    recurse(input.numbers).contains(&input.expected_answer)
+    recurse(input.numbers, combination_function).contains(&input.expected_answer)
+}
+
+fn solve<R: BufRead>(reader: R, combination_function: fn(u64, u64) -> Vec<u64>) -> Result<u64> {
+    let inputs = read_input(reader);
+
+    let mut answer = 0;
+    for input in inputs {
+        let potential_res = input.expected_answer;
+        let res = validate(input, combination_function);
+        if res {
+            answer += potential_res;
+        }
+    }
+
+    Ok(answer)
 }
 
 fn main() -> Result<()> {
@@ -74,19 +89,10 @@ fn main() -> Result<()> {
     println!("=== Part 1 ===");
 
     fn part1<R: BufRead>(reader: R) -> Result<u64> {
-        
-        let inputs = read_input(reader);
-
-        let mut answer = 0;
-        for input in inputs {
-            let potential_res = input.expected_answer;
-            let res = validate(input);
-            if res {
-                answer += potential_res;
-            }
+        fn combine(left: u64, right: u64) -> Vec<u64> {
+            vec![left + right, left * right]
         }
-
-        Ok(answer)
+        solve(reader, combine)
     }
 
     assert_eq!(3749, part1(BufReader::new(TEST.as_bytes()))?);
@@ -97,17 +103,21 @@ fn main() -> Result<()> {
     //endregion
 
     //region Part 2
-    // println!("\n=== Part 2 ===");
-    //
-    // fn part2<R: BufRead>(reader: R) -> Result<usize> {
-    //     Ok(0)
-    // }
-    //
-    // assert_eq!(0, part2(BufReader::new(TEST.as_bytes()))?);
-    //
-    // let input_file = BufReader::new(File::open(INPUT_FILE)?);
-    // let result = time_snippet!(part2(input_file)?);
-    // println!("Result = {}", result);
+    println!("\n=== Part 2 ===");
+
+    fn part2<R: BufRead>(reader: R) -> Result<u64> {
+        fn combine(left: u64, right: u64) -> Vec<u64> {
+            let cat = format!("{}{}", left, right).parse::<u64>().unwrap();
+            vec![left + right, left * right, cat]
+        }
+        solve(reader, combine)
+    }
+
+    assert_eq!(11387, part2(BufReader::new(TEST.as_bytes()))?);
+
+    let input_file = BufReader::new(File::open(INPUT_FILE)?);
+    let result = time_snippet!(part2(input_file)?);
+    println!("Result = {}", result);
     //endregion
 
     Ok(())
