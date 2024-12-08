@@ -34,6 +34,59 @@ fn calc_point_before(a: &Point, b: &Point) -> Point {
     (a.0 - dx, a.1 - dy)
 }
 
+fn get_a_lot_of_points_on_it(a: &Point, b: &Point) -> Vec<Point> {
+    let dx = b.0 - a.0;
+    let dy = b.1 - a.1;
+
+    (-100..100)
+        .map(|i| (a.0 + i * dx, a.1 + i * dy))
+        .collect::<Vec<Point>>()
+}
+
+fn solve<R: BufRead>(reader: R, is_part_2: bool) -> Result<usize> {
+    let mut input = vec![];
+    let mut input_map = HashMap::new();
+    for (i, line) in reader.lines().enumerate() {
+        let line = line?;
+        input.push(line.clone());
+        for (j, ch) in line.chars().enumerate() {
+            if ch != '.' {
+                input_map
+                    .entry(ch)
+                    .or_insert(Vec::new())
+                    .push((i as i32, j as i32));
+            }
+        }
+    }
+
+    let mut calc_points = HashSet::new();
+
+    for (_, points) in input_map.iter() {
+        points.iter().permutations(2).for_each(|perm| {
+            let a = perm[0];
+            let b = perm[1];
+            if is_part_2 {
+                let points = get_a_lot_of_points_on_it(a, b);
+                for p in points {
+                    calc_points.insert(p);
+                }
+            } else {
+                let p1 = calc_point_before(a, b);
+                let p2 = calc_point_before(b, a);
+                calc_points.insert(p1);
+                calc_points.insert(p2);
+            }
+        })
+    }
+
+    let in_bound = calc_points.iter().filter(|p| {
+        0 <= p.0 && p.0 < input.len() as i32 && 0 <= p.1 && p.1 < input[0].len() as i32
+    });
+    let result = in_bound.count();
+
+    Ok(result)
+}
+
 fn main() -> Result<()> {
     start_day(DAY);
 
@@ -41,40 +94,7 @@ fn main() -> Result<()> {
     println!("=== Part 1 ===");
 
     fn part1<R: BufRead>(reader: R) -> Result<usize> {
-        let mut input = vec![];
-        let mut input_map = HashMap::new();
-        for (i, line) in reader.lines().enumerate() {
-            let line = line?;
-            input.push(line.clone());
-            for (j, ch) in line.chars().enumerate() {
-                if ch != '.' {
-                    input_map
-                        .entry(ch)
-                        .or_insert(Vec::new())
-                        .push((i as i32, j as i32));
-                }
-            }
-        }
-
-        let mut calc_points = HashSet::new();
-
-        for (_, points) in input_map.iter() {
-            points.iter().permutations(2).for_each(|perm| {
-                let a = perm[0];
-                let b = perm[1];
-                let p1 = calc_point_before(a, b);
-                let p2 = calc_point_before(b, a);
-                calc_points.insert(p1);
-                calc_points.insert(p2);
-            })
-        }
-
-        let in_bound = calc_points.iter().filter(|p| {
-            0 <= p.0 && p.0 < input.len() as i32 && 0 <= p.1 && p.1 < input[0].len() as i32
-        });
-        let result = in_bound.count();
-
-        Ok(result)
+        solve(reader, false)
     }
 
     assert_eq!(14, part1(BufReader::new(TEST.as_bytes()))?);
@@ -85,17 +105,17 @@ fn main() -> Result<()> {
     //endregion
 
     //region Part 2
-    // println!("\n=== Part 2 ===");
-    //
-    // fn part2<R: BufRead>(reader: R) -> Result<usize> {
-    //     Ok(0)
-    // }
-    //
-    // assert_eq!(0, part2(BufReader::new(TEST.as_bytes()))?);
-    //
-    // let input_file = BufReader::new(File::open(INPUT_FILE)?);
-    // let result = time_snippet!(part2(input_file)?);
-    // println!("Result = {}", result);
+    println!("\n=== Part 2 ===");
+
+    fn part2<R: BufRead>(reader: R) -> Result<usize> {
+        solve(reader, true)
+    }
+
+    assert_eq!(34, part2(BufReader::new(TEST.as_bytes()))?);
+
+    let input_file = BufReader::new(File::open(INPUT_FILE)?);
+    let result = time_snippet!(part2(input_file)?);
+    println!("Result = {}", result);
     //endregion
 
     Ok(())
