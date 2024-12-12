@@ -35,8 +35,7 @@ fn simulate(number: u64, remaining_steps: u32) -> u64 {
     }
 }
 
-fn solve<R: BufRead>(mut reader: R, steps: u32) -> Result<u64>{
-
+fn solve<R: BufRead>(mut reader: R, steps: u32) -> Result<u64> {
     let mut buffer = String::new();
     reader.read_line(&mut buffer)?;
     let numbers = buffer
@@ -67,13 +66,13 @@ fn main() -> Result<()> {
 
     //region Part 2
     println!("\n=== Part 2 ===");
-    
+
     fn part2<R: BufRead>(reader: R) -> Result<u64> {
         solve(reader, 75)
     }
-    
+
     assert_eq!(65601038650482, part2(BufReader::new(TEST.as_bytes()))?);
-    
+
     let input_file = BufReader::new(File::open(INPUT_FILE)?);
     let result = time_snippet!(part2(input_file)?);
     println!("Result = {}", result);

@@ -2,9 +2,9 @@ use adv_code_2024::*;
 use anyhow::*;
 use code_timing_macros::time_snippet;
 use const_format::concatcp;
+use itertools::Itertools;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use itertools::Itertools;
 
 const DAY: &str = "10";
 const INPUT_FILE: &str = concatcp!("input/", DAY, ".txt");
@@ -22,7 +22,7 @@ const TEST: &str = "\
 
 const NEIGHBOURS: [[i32; 2]; 4] = [[-1, 0], [1, 0], [0, -1], [0, 1]];
 
-fn read_input<R: BufRead>(reader: R) -> Vec<Vec<i32>>  {
+fn read_input<R: BufRead>(reader: R) -> Vec<Vec<i32>> {
     let input = reader
         .lines()
         .map(|x| {
@@ -70,9 +70,8 @@ fn main() -> Result<()> {
 
     //region Part 1
     println!("=== Part 1 ===");
-    
-    fn sol<R: BufRead>(reader: R, unique: bool) -> Result<usize>{
 
+    fn sol<R: BufRead>(reader: R, unique: bool) -> Result<usize> {
         let input = read_input(reader);
 
         let mut res = 0;
@@ -102,13 +101,13 @@ fn main() -> Result<()> {
 
     //region Part 2
     println!("\n=== Part 2 ===");
-    
+
     fn part2<R: BufRead>(reader: R) -> Result<usize> {
         sol(reader, false)
     }
-    
+
     assert_eq!(81, part2(BufReader::new(TEST.as_bytes()))?);
-    
+
     let input_file = BufReader::new(File::open(INPUT_FILE)?);
     let result = time_snippet!(part2(input_file)?);
     println!("Result = {}", result);
