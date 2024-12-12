@@ -2,6 +2,7 @@ use adv_code_2024::*;
 use anyhow::*;
 use code_timing_macros::time_snippet;
 use const_format::concatcp;
+use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -37,15 +38,45 @@ MIIISIJEEE
 MMMISSJEEE
 ";
 
-const NEIGHBOURS: [[i32; 2]; 4] = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+const TEST4: &str = "\
+AAAAAA
+AAABBA
+AAABBA
+ABBAAA
+ABBAAA
+AAAAAA
+";
 
-fn get_neighbour_pos(pos: (i32, i32)) -> Vec<(i32, i32)> {
+const TEST5: &str = "\
+EEEEE
+EXXXX
+EEEEE
+EXXXX
+EEEEE
+";
+
+#[derive(Hash, PartialEq, Copy, Clone, Debug, Eq)]
+enum NeighbourType {
+    Top,
+    Bottom,
+    Left,
+    Right,
+}
+
+const NEIGHBOURS: [((i32, i32), NeighbourType); 4] = [
+    ((-1, 0), NeighbourType::Top),
+    ((1, 0), NeighbourType::Bottom),
+    ((0, -1), NeighbourType::Left),
+    ((0, 1), NeighbourType::Right),
+];
+
+fn get_neighbour_pos(pos: (i32, i32)) -> Vec<((i32, i32), NeighbourType)> {
     let mut res = vec![];
-    for n in NEIGHBOURS {
-        let nx = pos.0 + n[0];
-        let ny = pos.1 + n[1];
+    for (n, d) in NEIGHBOURS {
+        let nx = pos.0 + n.0;
+        let ny = pos.1 + n.1;
 
-        res.push((nx, ny));
+        res.push(((nx, ny), d));
     }
     res
 }
@@ -73,9 +104,109 @@ fn colorize(
     }
     visited[pos_x][pos_y] = color;
 
-    for (p, q) in get_neighbour_pos((x, y)) {
+    for ((p, q), _) in get_neighbour_pos((x, y)) {
         colorize(visited, field, p, q, color, exp_char);
     }
+}
+
+fn read_input<R: BufRead>(reader: R) -> Vec<Vec<char>> {
+    let lines = reader
+        .lines()
+        .map(|l| l.unwrap().chars().collect::<Vec<char>>())
+        .collect::<Vec<Vec<char>>>();
+
+    lines
+}
+
+fn group_field(field: Vec<Vec<char>>) -> HashMap<u64, HashSet<(i32, i32)>> {
+    let mut visited = field
+        .iter()
+        .map(|l| vec![0; l.len()])
+        .collect::<Vec<Vec<u64>>>();
+
+    let mut color = 1;
+    for i in 0..field.len() {
+        for (j, c) in field[i].iter().enumerate() {
+            colorize(&mut visited, &field, i as i32, j as i32, color, *c);
+            color += 1;
+        }
+    }
+
+    let mut groups = HashMap::new();
+    for (i, l) in visited.into_iter().enumerate() {
+        for (j, v) in l.into_iter().enumerate() {
+            groups
+                .entry(v)
+                .or_insert(HashSet::new())
+                .insert((i as i32, j as i32));
+        }
+    }
+    groups
+}
+
+#[derive(Clone, Debug, Hash)]
+struct Fence {
+    pos: (i32, i32),
+    kind: NeighbourType,
+}
+
+fn get_fences(g: &HashSet<(i32, i32)>) -> Vec<Fence> {
+    let mut fences = vec![];
+    for elem in g {
+        for (n, d) in get_neighbour_pos(*elem) {
+            if !g.contains(&n) {
+                let fence_position = (n.0 + elem.0, n.1 + elem.1);
+                fences.push(Fence {
+                    pos: fence_position,
+                    kind: d,
+                });
+            }
+        }
+    }
+    fences
+}
+
+fn count_sides_from_fences(fences: Vec<Fence>) -> usize {
+    let mut sides = 0;
+
+    for (r, grouped_fences) in fences.into_iter().into_group_map_by(|k| k.kind) {
+        let aligned_groups = grouped_fences.into_iter().into_group_map_by(|f| match r {
+            NeighbourType::Top | NeighbourType::Bottom => f.pos.0,
+            NeighbourType::Left | NeighbourType::Right => f.pos.1,
+        });
+
+        for aligned_fences in aligned_groups.into_values() {
+            let number_sides = aligned_fences
+                .into_iter()
+                .sorted_by(|a, b| a.pos.cmp(&b.pos))
+                .tuple_windows::<(Fence, Fence)>()
+                .filter(|(a, b)| (a.pos.0 - b.pos.0).abs() + (a.pos.1 - b.pos.1).abs() != 2)
+                .count()
+                + 1;
+            sides += number_sides;
+        }
+    }
+
+    sides
+}
+
+fn solve<R: BufRead>(reader: R, is_part_2: bool) -> Result<u64> {
+    let lines = read_input(reader);
+
+    let groups = group_field(lines);
+
+    let mut result = 0;
+    for g in groups.values() {
+        let fences = get_fences(g);
+        let surrounding = if is_part_2 {
+            count_sides_from_fences(fences)
+        } else {
+            fences.len()
+        };
+        result += surrounding as u64 * g.len() as u64;
+    }
+
+    Ok(result)
 }
 
 fn main() -> Result<()> {
@@ -85,47 +216,7 @@ fn main() -> Result<()> {
     println!("=== Part 1 ===");
 
     fn part1<R: BufRead>(reader: R) -> Result<u64> {
-        let lines = reader
-            .lines()
-            .map(|l| l.unwrap().chars().collect::<Vec<char>>())
-            .collect::<Vec<Vec<char>>>();
-        let mut visited = lines
-            .iter()
-            .map(|l| vec![0; l.len()])
-            .collect::<Vec<Vec<u64>>>();
-
-        let mut color = 1;
-        for i in 0..lines.len() {
-            for (j, c) in lines[i].iter().enumerate() {
-                colorize(&mut visited, &lines, i as i32, j as i32, color, *c);
-                color += 1;
-            }
-        }
-
-        let mut groups = HashMap::new();
-        for (i, _) in visited.iter().enumerate() {
-            for (j, _) in visited[i].iter().enumerate() {
-                groups
-                    .entry([visited[i][j]])
-                    .or_insert(HashSet::new())
-                    .insert((i as i32, j as i32));
-            }
-        }
-
-        let mut result = 0;
-        for g in groups.values() {
-            let mut fences = 0;
-            for elem in g {
-                for n in get_neighbour_pos(*elem) {
-                    if !g.contains(&n) {
-                        fences += 1;
-                    }
-                }
-            }
-            result += fences * g.len() as u64;
-        }
-
-        Ok(result)
+        solve(reader, false)
     }
 
     assert_eq!(140, part1(BufReader::new(TEST1.as_bytes()))?);
@@ -138,17 +229,21 @@ fn main() -> Result<()> {
     //endregion
 
     //region Part 2
-    // println!("\n=== Part 2 ===");
-    //
-    // fn part2<R: BufRead>(reader: R) -> Result<usize> {
-    //     Ok(0)
-    // }
-    //
-    // assert_eq!(0, part2(BufReader::new(TEST.as_bytes()))?);
-    //
-    // let input_file = BufReader::new(File::open(INPUT_FILE)?);
-    // let result = time_snippet!(part2(input_file)?);
-    // println!("Result = {}", result);
+    println!("\n=== Part 2 ===");
+
+    fn part2<R: BufRead>(reader: R) -> Result<u64> {
+        solve(reader, true)
+    }
+
+    assert_eq!(80, part2(BufReader::new(TEST1.as_bytes()))?);
+    assert_eq!(436, part2(BufReader::new(TEST2.as_bytes()))?);
+    assert_eq!(1206, part2(BufReader::new(TEST3.as_bytes()))?);
+    assert_eq!(368, part2(BufReader::new(TEST4.as_bytes()))?);
+    assert_eq!(236, part2(BufReader::new(TEST5.as_bytes()))?);
+
+    let input_file = BufReader::new(File::open(INPUT_FILE)?);
+    let result = time_snippet!(part2(input_file)?);
+    println!("Result = {}", result);
     //endregion
 
     Ok(())
