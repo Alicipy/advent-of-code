@@ -33,6 +33,7 @@ struct InputLine {
     vy: i64,
 }
 
+#[derive(Debug)]
 struct Simulated {
     x: i64,
     y: i64,
@@ -55,6 +56,57 @@ fn parse_input<R: BufRead>(reader: R) -> Result<Vec<InputLine>> {
     Ok(p)
 }
 
+fn simulate(l: &InputLine, steps: u64, width: i64, height: i64) -> Simulated {
+    let x = (((l.px + (steps as i64) * l.vx) % width) + width) % width;
+    let y = (((l.py + (steps as i64) * l.vy) % height) + height) % height;
+    Simulated { x, y }
+}
+
+#[allow(dead_code)]
+fn visualize_area(position: &[Simulated]) -> Vec<String> {
+    let mut area = [['.'; 120]; 120];
+
+    for p in position {
+        area[p.x as usize][p.y as usize] = 'x';
+    }
+
+    let plotted: Vec<_> = area.iter().map(String::from_iter).collect();
+
+    plotted
+}
+
+fn get_field_size(input: &[InputLine]) -> (i64, i64) {
+    if input.len() > 20 {
+        (101, 103)
+    } else {
+        (11, 7)
+    }
+}
+
+fn calc_distance(positions: &[Simulated]) -> i64 {
+    /* Okay, this one was fun!
+
+    At First, I tried to check if there is a horizontal line that is bigger than a limit,
+    but that was not successful.
+
+    I now calculate the sum of Manhattan distance and hope that the Christmas tree clutters.
+    As it turned out, there is a huge drop from the clusters to non-clustered (100k vs 130k),
+    so this seems to work well enough for me.
+    */
+
+    let manhattan_distance = positions
+        .iter()
+        .map(|f| {
+            positions
+                .iter()
+                .map(|g| (f.x - g.x).abs() + (f.y - g.y).abs())
+                .sum::<i64>()
+        })
+        .sum::<i64>();
+
+    manhattan_distance
+}
+
 fn main() -> Result<()> {
     start_day(DAY);
 
@@ -64,19 +116,11 @@ fn main() -> Result<()> {
     fn part1<R: BufRead>(reader: R) -> Result<u64> {
         let input = parse_input(reader)?;
 
-        let (width, height) = if input.len() > 20 {
-            (101, 103)
-        } else {
-            (11, 7)
-        };
+        let (width, height) = get_field_size(&input);
 
         let simulations = input
             .iter()
-            .map(|l| {
-                let x = (((l.px + 100 * l.vx) % width) + width) % width;
-                let y = (((l.py + 100 * l.vy) % height) + height) % height;
-                Simulated { x, y }
-            })
+            .map(|l| simulate(l, 100, width, height))
             .collect::<Vec<Simulated>>();
 
         let quadrants = simulations
@@ -92,7 +136,9 @@ fn main() -> Result<()> {
             })
             .filter(|((x, y), _b)| *x != Ordering::Equal && *y != Ordering::Equal)
             .into_group_map();
-        let result = quadrants.values().map(|y| y.iter().sum())
+        let result = quadrants
+            .values()
+            .map(|y| y.iter().sum())
             .reduce(|a, b| a * b)
             .unwrap();
 
@@ -107,17 +153,33 @@ fn main() -> Result<()> {
     //endregion
 
     //region Part 2
-    // println!("\n=== Part 2 ===");
-    //
-    // fn part2<R: BufRead>(reader: R) -> Result<usize> {
-    //     Ok(0)
-    // }
-    //
-    // assert_eq!(0, part2(BufReader::new(TEST.as_bytes()))?);
-    //
-    // let input_file = BufReader::new(File::open(INPUT_FILE)?);
-    // let result = time_snippet!(part2(input_file)?);
-    // println!("Result = {}", result);
+    println!("\n=== Part 2 ===");
+
+    fn part2<R: BufRead>(reader: R) -> Result<u64> {
+        let input = parse_input(reader)?;
+
+        let (width, height) = get_field_size(&input);
+
+        let minimal_dist_steps = (0..100_000)
+            .map(|steps| {
+                let simulations = input
+                    .iter()
+                    .map(|l| simulate(l, steps, width, height))
+                    .collect::<Vec<Simulated>>();
+
+                calc_distance(&simulations)
+            })
+            .position_min()
+            .unwrap();
+
+        Ok(minimal_dist_steps as u64)
+    }
+
+    //assert_eq!(0, part2(BufReader::new(TEST.as_bytes()))?); does not apply anymore
+
+    let input_file = BufReader::new(File::open(INPUT_FILE)?);
+    let result = time_snippet!(part2(input_file)?);
+    println!("Result = {}", result);
     //endregion
 
     Ok(())
