@@ -16,6 +16,7 @@ Register C: 0
 Program: 0,1,5,4,3,0
 ";
 
+#[derive(Debug)]
 struct ProgramState {
     reg_a: u64,
     reg_b: u64,
@@ -197,17 +198,63 @@ fn main() -> Result<()> {
     //endregion
 
     //region Part 2
-    // println!("\n=== Part 2 ===");
-    //
-    // fn part2<R: BufRead>(reader: R) -> Result<usize> {
-    //     Ok(0)
-    // }
-    //
-    // assert_eq!(0, part2(BufReader::new(TEST.as_bytes()))?);
-    //
-    // let input_file = BufReader::new(File::open(INPUT_FILE)?);
-    // let result = time_snippet!(part2(input_file)?);
-    // println!("Result = {}", result);
+    println!("\n=== Part 2 ===");
+
+    fn custom_part2_step(a: u64) -> Vec<u8> {
+        let mut a = a;
+        let mut output = vec![];
+
+        while a > 0 {
+            // 3,0
+            let mut b = a % 8; // 2,4
+            b ^= 3; // 1,3
+            let c = a >> b; // 7,5
+            a >>= 3; // 0,3
+            b ^= c; // 4,3
+            b ^= 5; // 1,5
+            output.push((b % 8) as u8); // 5,5
+                                        // 3,0
+        }
+
+        output
+    }
+
+    fn part2<R: BufRead>(reader: R) -> Result<u64> {
+        let (initial_program_state, instructions) = parse_input(reader)?;
+
+        let mut cur_result = 0_u64;
+
+        for i in 0..instructions.len() {
+            let expected_result: Vec<_> =
+                instructions.clone()[(instructions.len() - i - 1)..].to_vec();
+
+            println!("{expected_result:?}");
+            for j in 0.. {
+                let new_reg_a = (cur_result << 3) + j;
+                let full_output = custom_part2_step(new_reg_a);
+                if full_output == expected_result {
+                    cur_result = new_reg_a;
+                    break;
+                }
+            }
+        }
+
+        let check = simulate_program(
+            ProgramState {
+                reg_a: cur_result,
+                ..initial_program_state
+            },
+            &instructions,
+        );
+
+        assert_eq!(instructions, check);
+
+        Ok(cur_result)
+    }
+
+    let input_file = BufReader::new(File::open(INPUT_FILE)?);
+    let result = time_snippet!(part2(input_file)?);
+    println!("Result = {}", result);
     //endregion
 
     Ok(())
