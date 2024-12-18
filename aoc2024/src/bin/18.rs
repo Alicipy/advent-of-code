@@ -10,7 +10,7 @@ use std::io::{BufRead, BufReader};
 const DAY: &str = "18";
 const INPUT_FILE: &str = concatcp!("input/", DAY, ".txt");
 
-const TEST1: &str = "\
+const TEST: &str = "\
 5,4
 4,2
 4,5
@@ -69,7 +69,7 @@ fn prepare_field(relevant_input_fields: Vec<(usize, usize)>) -> Vec<Vec<char>> {
 
 const NEIGHBOUR: [(i32, i32); 4] = [(-1, 0), (1, 0), (0, -1), (0, 1)];
 
-fn search_shortest_path(field: Vec<Vec<char>>) -> Result<usize> {
+fn search_shortest_path(field: Vec<Vec<char>>) -> Option<usize> {
     let mut queue = VecDeque::new();
     queue.push_back(((0, 0), 0));
 
@@ -78,7 +78,7 @@ fn search_shortest_path(field: Vec<Vec<char>>) -> Result<usize> {
         .map(|f| f.iter().map(|_| false).collect::<Vec<_>>())
         .collect::<Vec<_>>();
 
-    loop {
+    while !queue.is_empty() {
         let (pos, way) = queue.pop_front().unwrap();
 
         if visited[pos.0][pos.1] {
@@ -86,7 +86,7 @@ fn search_shortest_path(field: Vec<Vec<char>>) -> Result<usize> {
         }
 
         if pos.0 == field.len() - 1 && pos.1 == field[0].len() - 1 {
-            return Ok(way);
+            return Some(way);
         }
 
         visited[pos.0][pos.1] = true;
@@ -104,6 +104,7 @@ fn search_shortest_path(field: Vec<Vec<char>>) -> Result<usize> {
             queue.push_back(((nx as usize, ny as usize), way + 1));
         }
     }
+    None
 }
 
 fn main() -> Result<()> {
@@ -118,28 +119,44 @@ fn main() -> Result<()> {
 
         let field = prepare_field(relevant_input_fields);
 
-        search_shortest_path(field)
+        Ok(search_shortest_path(field).unwrap())
     }
 
-    assert_eq!(22, part1(BufReader::new(TEST1.as_bytes()), 12)?);
+    assert_eq!(22, part1(BufReader::new(TEST.as_bytes()), 12)?);
 
+    /*
     let input_file = BufReader::new(File::open(INPUT_FILE)?);
     let result = time_snippet!(part1(input_file, 1024)?);
     println!("Result = {}", result);
+    */
     //endregion
 
     //region Part 2
-    // println!("\n=== Part 2 ===");
+    println!("\n=== Part 2 ===");
     //
-    // fn part2<R: BufRead>(reader: R) -> Result<usize> {
-    //     Ok(0)
-    // }
+    fn part2<R: BufRead>(reader: R) -> Result<String> {
+        let all_input_fields = parse_input(reader)?;
+        let possible_range = (0..all_input_fields.len()).collect::<Vec<_>>();
+        let point = possible_range.partition_point(|f| {
+            let relevant_input_fields = all_input_fields
+                .clone()
+                .into_iter()
+                .take(*f)
+                .collect::<Vec<_>>();
+            let field = prepare_field(relevant_input_fields);
+            search_shortest_path(field).is_some()
+        });
+
+        let coordinates = all_input_fields[point - 1];
+
+        Ok(format!("{},{}", coordinates.0, coordinates.1))
+    }
     //
-    // assert_eq!(0, part2(BufReader::new(TEST.as_bytes()))?);
+    assert_eq!("6,1", part2(BufReader::new(TEST.as_bytes()))?);
     //
-    // let input_file = BufReader::new(File::open(INPUT_FILE)?);
-    // let result = time_snippet!(part2(input_file)?);
-    // println!("Result = {}", result);
+    let input_file = BufReader::new(File::open(INPUT_FILE)?);
+    let result = time_snippet!(part2(input_file)?);
+    println!("Result = {}", result);
     //endregion
 
     Ok(())
