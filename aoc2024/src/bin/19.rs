@@ -38,22 +38,28 @@ fn parse_input<R: BufRead>(reader: R) -> Result<(Vec<String>, Vec<String>)> {
     Ok((available_patterns, requested))
 }
 
-fn check_possible(pattern: String, available_patterns: Vec<String>) -> bool {
+fn check_possible(pattern: String, available_patterns: Vec<String>) -> u64 {
     #[cached]
-    fn _check_possible(request: String, available_patterns: Vec<String>, idx: usize) -> bool {
+    fn _check_possible(request: String, available_patterns: Vec<String>, idx: usize) -> u64 {
         if idx >= request.len() {
-            return true;
+            return 1;
         };
         let relevant_rest = request[idx..].to_string();
 
-        let result = available_patterns.iter().any(|pattern| {
-            relevant_rest.starts_with(pattern)
-                && _check_possible(
-                    request.to_string(),
-                    available_patterns.clone(),
-                    idx + pattern.len(),
-                )
-        });
+        let result = available_patterns
+            .iter()
+            .map(|pattern| {
+                if relevant_rest.starts_with(pattern) {
+                    _check_possible(
+                        request.to_string(),
+                        available_patterns.clone(),
+                        idx + pattern.len(),
+                    )
+                } else {
+                    0
+                }
+            })
+            .sum();
         result
     }
 
@@ -72,7 +78,7 @@ fn main() -> Result<()> {
         let num_possible = requested
             .into_iter()
             .map(|r| check_possible(r, available_patterns.clone()))
-            .filter(|b| *b)
+            .filter(|b| *b > 0)
             .count() as u64;
         Ok(num_possible)
     }
@@ -85,17 +91,23 @@ fn main() -> Result<()> {
     //endregion
 
     //region Part 2
-    // println!("\n=== Part 2 ===");
-    //
-    // fn part2<R: BufRead>(reader: R) -> Result<usize> {
-    //     Ok(0)
-    // }
-    //
-    // assert_eq!(0, part2(BufReader::new(TEST.as_bytes()))?);
-    //
-    // let input_file = BufReader::new(File::open(INPUT_FILE)?);
-    // let result = time_snippet!(part2(input_file)?);
-    // println!("Result = {}", result);
+    println!("\n=== Part 2 ===");
+
+    fn part2<R: BufRead>(reader: R) -> Result<u64> {
+        let (available_patterns, requested) = parse_input(reader)?;
+
+        let num_possible = requested
+            .into_iter()
+            .map(|r| check_possible(r, available_patterns.clone()))
+            .sum::<u64>();
+        Ok(num_possible)
+    }
+
+    assert_eq!(16, part2(BufReader::new(TEST1.as_bytes()))?);
+
+    let input_file = BufReader::new(File::open(INPUT_FILE)?);
+    let result = time_snippet!(part2(input_file)?);
+    println!("Result = {}", result);
     //endregion
 
     Ok(())
