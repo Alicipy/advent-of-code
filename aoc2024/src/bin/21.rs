@@ -4,6 +4,8 @@ use adv_code_2024::*;
 use anyhow::*;
 use code_timing_macros::time_snippet;
 use const_format::concatcp;
+use rayon::prelude::*;
+use std::collections::VecDeque;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::result::Result::Ok;
@@ -11,6 +13,9 @@ use std::vec;
 
 const DAY: &str = "21";
 const INPUT_FILE: &str = concatcp!("input/", DAY, ".txt");
+
+// Not my proudest achivement, but worked out.
+// src/bin/21.rs:259 took 6986.517370348s.
 
 const TEST1: &str = "\
 029A
@@ -103,7 +108,7 @@ impl Keyboard {
             .flatten()
             .position(|k| k == &elem)
             .unwrap();
-        
+
         (
             elem_position / self.keymap[0].len(),
             elem_position % self.keymap[0].len(),
@@ -117,34 +122,91 @@ fn parse_input<R: BufRead>(reader: R) -> Vec<Vec<char>> {
         .map(|line| line.unwrap().chars().collect())
         .collect()
 }
+fn split_input_parts(input: Vec<char>) -> Result<(u64, Vec<ActionField>), Error> {
+    let numeric_prefix = String::from_iter(input[..=2].iter()).parse::<u64>()?;
 
-fn find_minimal_length_input(
-    keyboard_arrangement: Vec<Keyboard>,
+    let numeric_input: Vec<_> = input[..=3]
+        .iter()
+        .map(|x| {
+            if *x == 'A' {
+                Enter
+            } else {
+                Num(x.to_digit(10).unwrap() as u8)
+            }
+        })
+        .collect();
+    Ok((numeric_prefix, numeric_input))
+}
+
+struct KeyboardIterator<'a> {
+    keyboard: Keyboard,
+    from: Option<ActionField>,
+    to: Option<ActionField>,
+    current: VecDeque<ActionField>,
+    prev_iterator: Box<dyn Iterator<Item = ActionField> + 'a>,
+}
+
+impl<'a> KeyboardIterator<'a> {
+    fn new(
+        keyboard: Keyboard,
+        prev_iterator: Box<impl Iterator<Item = ActionField> + 'a>,
+    ) -> KeyboardIterator<'a> {
+        Self {
+            keyboard,
+            from: None,
+            to: Some(Enter),
+            current: VecDeque::new(),
+            prev_iterator,
+        }
+    }
+}
+
+impl Iterator for KeyboardIterator<'_> {
+    type Item = ActionField;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.to?;
+
+        let res = self.current.pop_front();
+        match res {
+            None => {
+                self.from = self.to;
+                let next = self.prev_iterator.next();
+                self.to = next;
+                match next {
+                    None => None,
+                    Some(_) => {
+                        let moves = self
+                            .keyboard
+                            .find_optimal_ordering(self.from.unwrap(), self.to.unwrap());
+                        self.current = moves.iter().map(|m| Movement(*m)).collect();
+                        self.current.push_back(Enter);
+                        self.next()
+                    }
+                }
+            }
+            Some(x) => Some(x),
+        }
+    }
+}
+
+fn find_minimal_length_input<'a>(
     wanted_result: Vec<ActionField>,
-) -> Vec<ActionField> {
-    let mut current_state = wanted_result;
+    num_keyboards: usize,
+) -> KeyboardIterator<'a> {
+    let keyboard_arrangement = vec![Keyboard::new_directional_keyboard(); num_keyboards];
+    //keyboard_arrangement.push(Keyboard::new_numeric_keyboard());
+
+    let mut current_iterator = KeyboardIterator::new(
+        Keyboard::new_numeric_keyboard(),
+        Box::new(wanted_result.into_iter()),
+    );
 
     for keyboard in keyboard_arrangement.into_iter().rev() {
-        current_state.insert(0, Enter);
-        //println!("{current_state:?}");
-
-        let mut nextrow = vec![];
-
-        for from_to in current_state.windows(2) {
-            let from = from_to[0];
-            let to = from_to[1];
-
-            let optimal_paths = keyboard.find_optimal_ordering(from, to);
-
-            for mv in optimal_paths {
-                nextrow.push(Movement(mv))
-            }
-            nextrow.push(Enter);
-        }
-        current_state = nextrow;
+        let iterator = KeyboardIterator::new(keyboard, Box::new(current_iterator));
+        current_iterator = iterator;
     }
-    //println!("{current_state:?}");
-    current_state
+    current_iterator
 }
 
 fn main() -> Result<()> {
@@ -153,38 +215,29 @@ fn main() -> Result<()> {
     //region Part 1
     println!("=== Part 1 ===");
 
-    fn part1<R: BufRead>(reader: R) -> Result<u64> {
+    fn solve<R: BufRead>(reader: R, robots: usize) -> Result<u64> {
         let inputs = parse_input(reader);
 
-        let keyboard_setup = vec![
-            Keyboard::new_directional_keyboard(),
-            Keyboard::new_directional_keyboard(),
-            Keyboard::new_numeric_keyboard(),
-        ];
+        let result = inputs
+            .into_par_iter()
+            .map(|input| {
+                let (numeric_prefix, numeric_input) = split_input_parts(input).unwrap();
 
-        let mut result = 0;
+                let minimal_length_input = find_minimal_length_input(numeric_input, robots);
+                let minimal_length = minimal_length_input.count();
 
-        for input in inputs.iter() {
-            let numeric_prefix = String::from_iter(input[..=2].iter()).parse::<u64>()?;
-
-            let numeric_input: Vec<_> = input[..=3]
-                .iter()
-                .map(|x| {
-                    if *x == 'A' {
-                        Enter
-                    } else {
-                        Num(x.to_digit(10).unwrap() as u8)
-                    }
-                })
-                .collect();
-
-            let minimal_length =
-                find_minimal_length_input(keyboard_setup.clone(), numeric_input).len();
-
-            result += numeric_prefix * minimal_length as u64;
-        }
+                numeric_prefix * minimal_length as u64
+            })
+            .sum();
 
         Ok(result)
+    }
+
+    assert_eq!(126384, solve(BufReader::new(TEST1.as_bytes()), 2)?);
+    assert_eq!(1881090, solve(BufReader::new(TEST1.as_bytes()), 5)?);
+
+    fn part1<R: BufRead>(reader: R) -> Result<u64> {
+        solve(reader, 2)
     }
 
     assert_eq!(126384, part1(BufReader::new(TEST1.as_bytes()))?);
@@ -192,23 +245,20 @@ fn main() -> Result<()> {
     let input_file = BufReader::new(File::open(INPUT_FILE)?);
     let result = time_snippet!(part1(input_file)?);
     println!("Result = {}", result);
-    /*
     //endregion
 
     //region Part 2
     println!("\n=== Part 2 ===");
 
-    fn part2<R: BufRead>(reader: R) -> Result<usize> {
-
-        Ok(result)
+    fn part2<R: BufRead>(reader: R) -> Result<u64> {
+        solve(reader, 25)
     }
 
-    assert_eq!(0, part2(BufReader::new(TEST1.as_bytes()))?);
-    */
+    assert_eq!(246810588779586, part2(BufReader::new(TEST1.as_bytes()))?);
 
-    //let input_file = BufReader::new(File::open(INPUT_FILE)?);
-    //let result = time_snippet!(part2(input_file)?);
-    //println!("Result = {}", result);
+    let input_file = BufReader::new(File::open(INPUT_FILE)?);
+    let result = time_snippet!(part2(input_file)?);
+    println!("Result = {}", result);
     //endregion
 
     Ok(())
