@@ -2,6 +2,7 @@ use adv_code_2024::*;
 use anyhow::*;
 use code_timing_macros::time_snippet;
 use const_format::concatcp;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
@@ -12,6 +13,13 @@ const TEST1: &str = "\
 1
 10
 100
+2024
+";
+
+const TEST2: &str = "\
+1
+2
+3
 2024
 ";
 
@@ -87,17 +95,64 @@ fn main() -> Result<()> {
     //endregion
 
     //region Part 2
-    // println!("\n=== Part 2 ===");
-    //
-    // fn part2<R: BufRead>(reader: R) -> Result<usize> {
-    //     Ok(0)
-    // }
-    //
-    // assert_eq!(0, part2(BufReader::new(TEST.as_bytes()))?);
-    //
-    // let input_file = BufReader::new(File::open(INPUT_FILE)?);
-    // let result = time_snippet!(part2(input_file)?);
-    // println!("Result = {}", result);
+    println!("\n=== Part 2 ===");
+
+    fn part2<R: BufRead>(reader: R) -> Result<u32> {
+        let numbers = parse_input(reader);
+
+        let ape_numbers: Vec<Vec<_>> = numbers
+            .iter()
+            .map(|s| SecretIterator { last_secret: *s })
+            .map(|it| {
+                it.take(2000)
+                    .map(|x| (x as u32) % 10)
+                    .collect::<Vec<u32>>()
+                    .windows(2)
+                    .map(|nums| (nums[1] as i32 - (nums[0] as i32), nums[1]))
+                    .collect()
+            })
+            .collect();
+
+        let itermaps: Vec<_> = ape_numbers
+            .iter()
+            .map(|app| {
+                let mut first_number_map = HashMap::new();
+                app.windows(4).for_each(|x| {
+                    let ((a, _), (b, _), (c, _), (d, num)) = (x[0], x[1], x[2], x[3]);
+
+                    let key = (a, b, c, d);
+                    if !first_number_map.contains_key(&key) {
+                        first_number_map.insert((a, b, c, d), num);
+                    }
+                });
+                first_number_map
+            })
+            .collect();
+
+        let mut all_first_numbs = HashMap::new();
+        for m in itermaps {
+            for (sequence, firstnum) in m.into_iter() {
+                all_first_numbs
+                    .entry(sequence)
+                    .or_insert(vec![])
+                    .push(firstnum);
+            }
+        }
+
+        let res = all_first_numbs
+            .values()
+            .map(|x| x.iter().sum::<u32>())
+            .max()
+            .unwrap();
+
+        Ok(res)
+    }
+
+    assert_eq!(23, part2(BufReader::new(TEST2.as_bytes()))?);
+
+    let input_file = BufReader::new(File::open(INPUT_FILE)?);
+    let result = time_snippet!(part2(input_file)?);
+    println!("Result = {}", result);
     //endregion
 
     Ok(())
