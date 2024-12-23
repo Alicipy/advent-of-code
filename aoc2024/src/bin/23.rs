@@ -2,15 +2,17 @@ use adv_code_2024::*;
 use anyhow::*;
 use code_timing_macros::time_snippet;
 use const_format::concatcp;
-use std::cmp::{max, min, Ordering};
+use itertools::Itertools;
+use std::cmp::{max, min};
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
+use std::vec;
 
 const DAY: &str = "23";
 const INPUT_FILE: &str = concatcp!("input/", DAY, ".txt");
 
-const TEST1: &str = "\
+const TEST: &str = "\
 kh-tc
 qp-kh
 de-cg
@@ -45,7 +47,25 @@ tb-vc
 td-yn
 ";
 
-fn parse_input<R: BufRead>(reader: R) -> HashSet<(String, String)> {
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
+struct Node(String);
+
+#[derive(Eq, Hash, PartialEq)]
+struct Connection {
+    n1: Node,
+    n2: Node,
+}
+
+impl Connection {
+    fn new(n1: Node, n2: Node) -> Self {
+        Connection {
+            n1: min(n1.clone(), n2.clone()),
+            n2: max(n1, n2),
+        }
+    }
+}
+
+fn parse_input<R: BufRead>(reader: R) -> HashSet<Connection> {
     reader
         .lines()
         .map(|line| {
@@ -53,9 +73,52 @@ fn parse_input<R: BufRead>(reader: R) -> HashSet<(String, String)> {
             let (a, b) = binding.split_once('-').unwrap();
             let a = a.to_string();
             let b = b.to_string();
-            (min(a.clone(), b.clone()), max(a, b))
+            Connection::new(Node(a), Node(b))
         })
         .collect()
+}
+
+fn construct_cliques(connections: &HashSet<Connection>) -> Vec<HashSet<Node>> {
+    let all_nodes: HashSet<_> = connections
+        .iter()
+        .flat_map(|f| vec![f.n1.clone(), f.n2.clone()])
+        .collect();
+
+    let mut all_cliques: Vec<HashSet<_>> = vec![];
+
+    let mut last_step_cliques = vec![HashSet::new()];
+
+    while !last_step_cliques.is_empty() {
+        all_cliques.extend(last_step_cliques.clone());
+
+        let mut new_cliques = vec![];
+
+        for c in last_step_cliques.into_iter() {
+            for node in all_nodes.iter() {
+                if c.clone()
+                    .into_iter()
+                    .all(|cn| connections.contains(&Connection::new(node.clone(), cn)))
+                {
+                    let mut new_clique = c.clone();
+                    new_clique.insert(node.clone());
+                    new_cliques.push(new_clique);
+                }
+            }
+        }
+
+        new_cliques.sort_by(|a, b| {
+            let av: Vec<Node> = a.clone().into_iter().sorted().collect();
+            let ab: Vec<Node> = b.clone().into_iter().sorted().collect();
+
+            av.cmp(&ab)
+        });
+        new_cliques.dedup();
+
+        last_step_cliques = new_cliques;
+        println!("{:?}", last_step_cliques.len());
+    }
+
+    all_cliques
 }
 
 fn main() -> Result<()> {
@@ -67,57 +130,53 @@ fn main() -> Result<()> {
     fn part1<R: BufRead>(reader: R) -> Result<u64> {
         let connections = parse_input(reader);
 
-        let mut known_computers = HashSet::new();
-        for (c1, c2) in connections.iter() {
-            known_computers.insert(c1.to_owned());
-            known_computers.insert(c2.to_owned());
-        }
+        let all_cliques = construct_cliques(&connections);
 
-        let mut known_with_t = 0;
-
-        for a in known_computers.iter() {
-            for b in known_computers
-                .iter()
-                .filter(|d| a.cmp(d) == Ordering::Less)
-            {
-                for c in known_computers
-                    .iter()
-                    .filter(|d| b.cmp(d) == Ordering::Less)
-                {
-                    if connections.contains(&(a.clone(), b.clone()))
-                        && connections.contains(&(a.clone(), c.clone()))
-                        && connections.contains(&(b.clone(), c.clone()))
-                        && (a.starts_with("t") || b.starts_with("t") || c.starts_with("t"))
-                    {
-                        known_with_t += 1;
-                    }
-                }
-            }
-        }
+        let known_with_t = all_cliques
+            .iter()
+            .filter(|c| c.iter().count() == 3)
+            .filter(|s| s.iter().any(|n| n.0.starts_with("t")))
+            .count() as u64;
 
         Ok(known_with_t)
     }
 
-    assert_eq!(7, part1(BufReader::new(TEST1.as_bytes()))?);
+    assert_eq!(7, part1(BufReader::new(TEST.as_bytes()))?);
 
+    /*
     let input_file = BufReader::new(File::open(INPUT_FILE)?);
     let result = time_snippet!(part1(input_file)?);
     println!("Result = {}", result);
+    */
     //endregion
 
     //region Part 2
-    // println!("\n=== Part 2 ===");
-    //
-    // fn part2<R: BufRead>(reader: R) -> Result<usize> {
-    //     Ok(0)
-    // }
-    //
-    // assert_eq!(0, part2(BufReader::new(TEST.as_bytes()))?);
-    //
-    // let input_file = BufReader::new(File::open(INPUT_FILE)?);
-    // let result = time_snippet!(part2(input_file)?);
-    // println!("Result = {}", result);
+    println!("\n=== Part 2 ===");
+
+    fn part2<R: BufRead>(reader: R) -> Result<String> {
+        let connections = parse_input(reader);
+
+        let all_cliques = construct_cliques(&connections);
+
+        let biggest_clique = all_cliques.last().unwrap();
+
+        let mut nodes = biggest_clique.iter().collect_vec();
+        nodes.sort();
+        let output = nodes.into_iter().map(|n| n.0.to_string()).join(",");
+
+        Ok(output)
+    }
+
+    assert_eq!(
+        "co,de,ka,ta".to_string(),
+        part2(BufReader::new(TEST.as_bytes()))?
+    );
+
+    let input_file = BufReader::new(File::open(INPUT_FILE)?);
+    let result = time_snippet!(part2(input_file)?);
+    println!("Result = {}", result);
     //endregion
+    //
 
     Ok(())
 }
