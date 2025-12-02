@@ -1,0 +1,29 @@
+[project]
+name = "aoc2025"
+version = "0.0.0"
+description = "Alicipy 'Advent of code' 2025"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+alicipy-aoc2025 = "aoc2025.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+extend-select = ['E', 'I', 'UP']
+
+[tool.ruff.format]
+quote-style = "double"
+line-ending = "auto"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.14.7",
+]
