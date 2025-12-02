@@ -18,6 +18,8 @@ alicipy-aoc2025 -d 1 -p 2
 This will read the input file `input_{:02d}` from `data` of the current
 working directory and print the result of part 2.
 
+The input files are not included in this repository.
+
 ## Project layout
 
 ```
@@ -32,6 +34,6 @@ src/
       main.py       # implements part_1() and part_2()
     ...
 data/
-  input_01          # input for day 01
+  input_01          # input for day 01, not included
   ...
 ```
