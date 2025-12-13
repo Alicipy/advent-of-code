@@ -4,7 +4,9 @@ version = "0.0.0"
 description = "Alicipy 'Advent of code' 2025"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "scipy>=1.16.3",
+]
 
 [project.scripts]
 alicipy-aoc2025 = "aoc2025.main:main"
